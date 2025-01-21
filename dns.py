@@ -25,7 +25,6 @@ class DNSHandler(socketserver.BaseRequestHandler):
             reply = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
 
             qname = str(request.q.qname)
-            qtype = QTYPE[request.q.qtype]
 
             if qname in DOMAIN_TO_IP:
                 reply.add_answer(RR(qname, QTYPE.A, rdata=A(DOMAIN_TO_IP[qname])))

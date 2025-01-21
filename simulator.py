@@ -10,7 +10,7 @@ dns_server = "10.0.0.10"
 # Function to send an HTTP request to a web server
 def send_http_request(server_ip):
     url = f"http://{server_ip}"
-    request_type = random.choice(["GET", "POST", "HEAD"])
+    request_type = random.choice(["GET", "POST", "HEAD", "PUT", "PATCH", "OPTIONS", "DELETE"])
     params = {"q": random.choice(["data1", "data2", "data3"])}  # Random query string
 
     if request_type == "GET":
@@ -19,6 +19,14 @@ def send_http_request(server_ip):
         requests.post(url, data={"key": "value"}, timeout=2)
     elif request_type == "HEAD":
         requests.head(url, timeout=2)
+    elif request_type == "PUT":
+        requests.put(url, data={"key": "updated_value"}, timeout=2)
+    elif request_type == "PATCH":
+        requests.patch(url, data={"key": "patched_value"}, timeout=2)
+    elif request_type == "OPTIONS":
+        requests.options(url, timeout=2)
+    elif request_type == "DELETE":
+        requests.delete(url, timeout=2) 
 
 # Function to send a ping to a server
 def send_ping(server_ip):
@@ -31,7 +39,7 @@ def send_ping(server_ip):
 
 # Function to perform an nslookup using the DNS server
 def perform_nslookup(dns_ip):
-    query_name = random.choice(["portal1.com", "example.com", "service.local"])
+    query_name = random.choice(["portal1.com", "portal2.com", "portal3.local"])
     subprocess.run(["nslookup", query_name, dns_ip],
                    stdout=subprocess.PIPE,
                    stderr=subprocess.PIPE,
