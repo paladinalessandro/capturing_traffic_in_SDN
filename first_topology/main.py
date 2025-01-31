@@ -1,78 +1,90 @@
-import time
+#!/usr/bin/python3
+
+from mininet.topo import Topo
 from mininet.net import Mininet
-from mininet.node import Controller, OVSKernelSwitch, RemoteController
+from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.cli import CLI
-from mininet.log import setLogLevel, info
 from mininet.link import TCLink
+import subprocess
+import time
 
-def parse_args(parser):
-    parser.add_argument("-k", type=int, default=1,
-                        help="Create a topology with k webservers")
-    return parser.parse_args()
+class NetworkSlicingTopo(Topo):
+    def __init__(self):
+        #initialize topology
+        Topo.__init__(self)
 
-def createNetwork(k=3):
-    net = Mininet(controller=Controller, switch=OVSKernelSwitch, link=TCLink)
+        #create template host,switch and Link
 
-    info('*** Adding controller\n')
-    controller = RemoteController("c1", ip="127.0.0.1", port=6633)
-    net.addController(controller)
+        host_config = dict(inNamespace=True)
+        link_config = dict() #total capacity of the link 10Mbps
+        host_link_config = dict()
 
-    webservers = []
-    for i in range(1, k+1):
-        webservers.append(net.addHost('web' + str(i),ip='10.0.0.' + str(i)))
-    dns = net.addHost('dns',ip='10.0.0.10')
+        #create routers nodes - 4 routers in our case
+        for i in range(4):
+            sconfig = {"dpid": "%016x" % (i+1)}
+            self.addSwitch("s%d" % (i+1), **sconfig)
 
-    info('*** Adding switches\n') 
-    switches = []
-    for i in range(1, 5):
-        switches.append(net.addSwitch('s' + str(i), cls=OVSKernelSwitch, protocols='OpenFlow13'))
+        #create host nodes - 7 host nodes
 
+        self.addHost("dns",ip="10.0.0.10")
 
-    info('*** Adding routers\n')
-    r1 = net.addHost('r1')
-    r2 = net.addHost('r2')
+        for i in range(1, 4):
+            self.addHost("web" + str(i),ip="10.0.0." + str(i))
 
-    #Rete aziendale
-    intra = net.addHost('intra')
+        #ISP
+        self.addHost("r1",ip="10.0.0.5")
+        self.addHost("r2",ip="10.0.0.6")
 
-    info('*** Creating links\n')
-    # Router & Switch links
-    net.addLink(switches[0], r1,bw=100*8, delay='10ms', max_queue_size=1000)
-    net.addLink(switches[0], intra)
-    net.addLink(switches[0], switches[2], delay='9ms', max_queue_size=1000)
+        #Rete aziendale
+        self.addHost("intra",ip="10.0.0.7")
 
-    net.addLink(switches[1], r2,bw=70*8, delay='14ms', max_queue_size=1000)
-    net.addLink(switches[1], switches[2], delay='12ms', max_queue_size=1000)
-    net.addLink(switches[1], switches[3], delay='11ms', max_queue_size=1000)
+        #add links
+        self.addLink("s1", "s3")
+        self.addLink("s3", "s2")
+        self.addLink("s2", "s4")
 
-    net.addLink(switches[3], dns)
+        self.addLink("intra", "s1")
+        self.addLink("r1","s1",bw=70)
+        self.addLink("r2","s2",bw=70)
+        self.addLink("dns","s4")
+        self.addLink("web1","s3",bw=50)
+        self.addLink("web2","s3",bw=50)
+        self.addLink("web3","s3",bw=50)
 
-    # Switch to Host links
-    for i in range(0, k):
-        net.addLink(switches[2], webservers[i],bw=50*8)
+topos = {"networkslicingtopo": (lambda: NetworkSlicingTopo())}
 
-    info('*** Starting network\n')
+if __name__=="__main__":
+    topo = NetworkSlicingTopo()
+    net = Mininet(
+        topo=topo,
+        controller=RemoteController('c0', ip='127.0.0.1'),
+        switch=OVSKernelSwitch,
+        build=False,
+        autoSetMacs=True,
+        autoStaticArp=True,
+        link=TCLink,
+    )
+
+    net.build()
     net.start()
-    for i in range(k):
+    subprocess.call("./total_connectivity.sh")
+
+    webservers = ['web1','web2','web3']
+    for i in range(3):
         webserver = webservers[i]
         cmd = "sudo python3 custom_http_server.py &"
         print("Running '{}' at web{}".format(cmd, i+1))
-        webserver.cmd(cmd)
+        net.get(webserver).cmd(cmd)
         time.sleep(0.2)
+
     print("Starting the local DNS service")
-    dns.cmd("python3 dns.py &")
+    net.get('dns').cmd("python3 dns.py &")
     time.sleep(0.2)
 
-    intra.cmd("python3 simulator.py &")
+    net.get('intra').cmd("python3 simulator.py &")
     for i in range(20):
-        r1.cmd("python3 simulator.py &")
-
-    info('*** Running CLI\n')
+        net.get('r1').cmd("python3 simulator.py &")
+        
     CLI(net)
-
-    info('*** Stopping network')
-    net.stop()
-
-if __name__ == '__main__':
-    setLogLevel('info')
-    createNetwork()
+    net.stop
+        
