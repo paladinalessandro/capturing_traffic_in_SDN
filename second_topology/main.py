@@ -19,8 +19,8 @@ class NetworkSlicingTopo(Topo):
         link_config = dict() #total capacity of the link 10Mbps
         host_link_config = dict()
 
-        #create routers nodes - 4 routers in our case
-        for i in range(3):
+        #create routers nodes - 2 routers in our case
+        for i in range(2):
             sconfig = {"dpid": "%016x" % (i+1)}
             self.addSwitch("s%d" % (i+1), **sconfig)
 
@@ -40,15 +40,14 @@ class NetworkSlicingTopo(Topo):
 
         #add links
         self.addLink("s1", "s2")
-        self.addLink("s2", "s3")
-        self.addLink("s1", "s3")
+        
 
         self.addLink("r1", "s1",bw=100)
         self.addLink("web1","s1",bw=50)
         self.addLink("web2","s1",bw=50)
-        self.addLink("intra","s3")
-        self.addLink("web3","s3",bw=50)
-        self.addLink("dns","s2")
+        self.addLink("intra","s2")
+        self.addLink("web3","s2",bw=50)
+        self.addLink("dns","s1")
 
         
 
@@ -90,4 +89,3 @@ if __name__=="__main__":
         
     CLI(net)
     net.stop
-        
